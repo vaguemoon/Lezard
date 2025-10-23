@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>learning-lab｜教學入口</title>
+  <style>
+    :root{--bg:#0f172a;--fg:#e5e7eb;--card:#111827;--muted:#94a3b8;--accent:#22c55e}
+    *{box-sizing:border-box} body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,PingFang TC,"Microsoft JhengHei",Arial;background:radial-gradient(1200px 800px at 80% -10%, #1f2937 0%, var(--bg) 60%);color:var(--fg)}
+    .wrap{max-width:960px;margin:0 auto;padding:28px}
+    h1{margin:0 0 8px;font-size:clamp(22px,3vw,36px)} p{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:24px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px;text-decoration:none;color:inherit;display:block}
+    .card:hover{outline:2px solid rgba(34,197,94,.45)}
+    .tag{display:inline-block;font-size:12px;color:#0b1220;background:linear-gradient(120deg,#22c55e,#06b6d4);padding:4px 8px;border-radius:999px;font-weight:700;margin-bottom:8px}
+    .title{font-weight:900;margin:6px 0 2px} .desc{color:var(--muted);font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>learning-lab 教學入口</h1>
+    <p>請點選想要的教材。</p>
+
+    <h2>數學 Math</h2>
+    <div class="grid">
+      <a class="card" href="./math/九九乘法練習/">
+        <span class="tag">App</span>
+        <div class="title">九九乘法練習（觸控版）</div>
+        <div class="desc">1–12 範圍、側邊乘法表、數字鍵盤與音效回饋。</div>
+      </a>
+    </div>
+
+    <!-- 未來可以繼續加其他科目區塊（english, science...） -->
+  </div>
+</body>
+</html>
