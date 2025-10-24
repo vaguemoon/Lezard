@@ -1,5 +1,5 @@
 // 超簡版快取：首次開啟後可離線使用
-const CACHE = 'hq-v1'
+const CACHE = 'hq-v2'
 const ASSETS = [
   './',
   './index.html',
