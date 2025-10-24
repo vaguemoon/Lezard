@@ -2,6 +2,40 @@ name: Deploy Pages
 on:
   push:
     branches: [ main ]
+  workflow_dispatch: {}   # ← 允許手動重跑（Run workflow）
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 如果你的網站就是 repo 根目錄（有 index.html 在根目錄）
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .   # ← 發佈整個根目錄
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+name: Deploy Pages
+on:
+  push:
+    branches: [ main ]
 permissions:
   pages: write
   id-token: write
