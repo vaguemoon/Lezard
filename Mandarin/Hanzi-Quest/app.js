@@ -6,6 +6,145 @@ const CharState = {
   drawnLength: 0, // 用於簡單評分
 }
 
+// ====== 形狀比對核心 ======
+function renderTemplateGlyph(char, size=256) {
+  const c = document.createElement('canvas'); c.width=c.height=size
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#000'
+  // 自動縮放字體讓字填滿方框（保留邊界）
+  let fontSize = size * 0.8
+  ctx.font = `${fontSize}px system-ui, "Noto Sans CJK TC", sans-serif`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  // 微調直到寬高落在方框內（粗估即可）
+  for (let k=0;k<4;k++){
+    ctx.clearRect(0,0,size,size)
+    ctx.fillText(char, size/2, size/2)
+    const {w,h} = roughBBox(ctx, size)
+    const scale = 0.88 / Math.max(w/size, h/size)
+    fontSize *= scale
+    ctx.font = `${fontSize}px system-ui, "Noto Sans CJK TC", sans-serif`
+  }
+  ctx.clearRect(0,0,size,size)
+  ctx.fillText(char, size/2, size/2)
+  return c
+}
+
+function roughBBox(ctx, size){
+  const img = ctx.getImageData(0,0,size,size).data
+  let minX=size,maxX=0,minY=size,maxY=0, found=false
+  for (let y=0;y<size;y++){
+    for (let x=0;x<size;x++){
+      const a = img[(y*size+x)*4+3]
+      if (a>0){ found=true; if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y }
+    }
+  }
+  if(!found) return {x:0,y:0,w:size,h:size}
+  return {x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}
+}
+
+function captureStudentBitmap(size=256){
+  // 把目前主畫布的筆跡等比放大到 size×size，去掉邊距
+  const src = el.canvas
+  const c = document.createElement('canvas'); c.width=c.height=size
+  const ctx = c.getContext('2d')
+  // 擷取筆跡的邊界盒
+  const bbox = inkBBox(src)
+  if (!bbox) return c
+  ctx.drawImage(src, bbox.x, bbox.y, bbox.w, bbox.h, 0,0, size, size)
+  return c
+}
+
+function inkBBox(canvas){
+  const ctx = canvas.getContext('2d')
+  const {width:w,height:h} = canvas
+  const img = ctx.getImageData(0,0,w,h).data
+  let minX=w,maxX=0,minY=h,maxY=0, found=false
+  for (let y=0;y<h;y++){
+    for (let x=0;x<w;x++){
+      const a = img[(y*w+x)*4+3]
+      if (a>10){ found=true; if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y }
+    }
+  }
+  if(!found) return null
+  return {x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}
+}
+
+function toGridBool(canvas, N=64, threshold=64){
+  // 將畫布縮到 N×N，>threshold 當成 1
+  const tmp = document.createElement('canvas'); tmp.width=tmp.height=N
+  const tctx = tmp.getContext('2d')
+  tctx.drawImage(canvas, 0,0, N,N)
+  const img = tctx.getImageData(0,0,N,N).data
+  const grid = Array.from({length:N},()=>Array(N).fill(0))
+  for (let y=0;y<N;y++){
+    for (let x=0;x<N;x++){
+      const a = img[(y*N+x)*4+3]
+      grid[y][x] = a>threshold ? 1 : 0
+    }
+  }
+  return grid
+}
+
+function neighborHit(gridA, gridB, r=2){
+  // 對 gridA 的每個 1，檢查 gridB 半徑 r 內是否有 1
+  const N = gridA.length
+  let hit=0, total=0
+  for (let y=0;y<N;y++){
+    for (let x=0;x<N;x++){
+      if (!gridA[y][x]) continue
+      total++
+      let ok = false
+      for (let dy=-r; dy<=r && !ok; dy++){
+        const yy = y+dy; if (yy<0||yy>=N) continue
+        for (let dx=-r; dx<=r; dx++){
+          const xx = x+dx; if (xx<0||xx>=N) continue
+          if (gridB[yy][xx]) { ok=true; break }
+        }
+      }
+      if (ok) hit++
+    }
+  }
+  return total ? hit/total : 0
+}
+
+function diffDots(gridStu, gridTpl, step=4){
+  // 回傳兩類差異點：stu-only（紅）、tpl-missing（藍）
+  const N = gridStu.length
+  const reds = [], blues = []
+  for (let y=0;y<N;y+=step){
+    for (let x=0;x<N;x+=step){
+      if (gridStu[y][x] && !gridTpl[y][x]) reds.push([x,y])
+      if (gridTpl[y][x] && !gridStu[y][x]) blues.push([x,y])
+    }
+  }
+  return {reds, blues}
+}
+
+function placeDots(dots, color){
+  // 把差異點放到主畫布上（對應縮放）
+  const box = el.canvas.getBoundingClientRect()
+  const N = 64
+  // 先清掉舊的
+  document.querySelectorAll('.dot').forEach(n=>n.remove())
+  dots.reds.forEach(([x,y])=>{
+    const d = document.createElement('div')
+    d.className='dot'; d.style.background=color.red
+    d.style.left = (el.canvas.offsetLeft + x/N*el.canvas.width - 3)+'px'
+    d.style.top  = (el.canvas.offsetTop  + y/N*el.canvas.height - 3)+'px'
+    d.style.position='absolute'
+    el.canvas.parentElement.appendChild(d)
+  })
+  dots.blues.forEach(([x,y])=>{
+    const d = document.createElement('div')
+    d.className='dot'; d.style.background=color.blue
+    d.style.left = (el.canvas.offsetLeft + x/N*el.canvas.width - 3)+'px'
+    d.style.top  = (el.canvas.offsetTop  + y/N*el.canvas.height - 3)+'px'
+    d.style.position='absolute'
+    el.canvas.parentElement.appendChild(d)
+  })
+}
+
+
 async function loadDefaultList() {
   const res = await fetch('./data/sample-characters.csv')
   const text = await res.text()
@@ -97,15 +236,36 @@ el.canvas.addEventListener('pointerdown', e => { e.preventDefault(); el.canvas.s
 el.canvas.addEventListener('pointermove', e => moveDraw(e.offsetX,e.offsetY))
 window.addEventListener('pointerup', () => endDraw())
 
-// 簡單評分：依「描紅長度」與「用時」給星等（不做真實字形比對，MVP 示意）
 function finishQuestion() {
-  const elapsed = Math.max(300, performance.now() - CharState.startAt) // ms
-  const lenScore = Math.min(1, CharState.drawnLength / 800)          // 畫得越多越像
-  const timeScore = Math.min(1, 6000 / elapsed)                       // 太久扣分
-  const score = 0.65 * lenScore + 0.35 * timeScore
+  // 1) 構建模板與學生位圖
+  const char = CharState.list[CharState.index]
+  const tplCanvas = renderTemplateGlyph(char, 256)
+  const stuCanvas = captureStudentBitmap(256)
+
+  // 2) 轉 64×64 網格
+  const tplG = toGridBool(tplCanvas, 64, 40)
+  const stuG = toGridBool(stuCanvas, 64, 40)
+
+  // 3) 兩向鄰近比對（半徑 r = 2 可容忍位移）
+  const coverage  = neighborHit(tplG, stuG, 2)   // 標準 → 學生
+  const precision = neighborHit(stuG, tplG, 2)   // 學生 → 標準
+  const score = 0.6 * coverage + 0.4 * precision
   const stars = score >= 0.9 ? 3 : score >= 0.75 ? 2 : score >= 0.55 ? 1 : 0
-  el.result.textContent = `評分：${Math.round(score*100)} 分，⭐️ x ${stars}`
+  el.result.textContent = `評分：${Math.round(score*100)} 分，⭐ x ${stars}`
+
+  // 4) 視覺化回饋（紅=多畫或偏離；藍=漏畫）
+  const wantFeedback = document.getElementById('showFeedback')?.checked
+  if (wantFeedback){
+    const dots = diffDots(stuG, tplG, 3)
+    placeDots(dots, { red: '#ef4444', blue: '#3b82f6' })
+  } else {
+    document.querySelectorAll('.dot').forEach(n=>n.remove())
+  }
+
+  // 5) 成就統計（沿用原本）
   updateAchievements(stars)
+}
+
 }
 
 function updateAchievements(stars) {
