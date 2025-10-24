@@ -14,3 +14,4 @@ button, select, textarea { padding: 8px 10px; border-radius: 10px; border: 1px s
 button { cursor:pointer; }
 .list { margin:0; padding-left: 18px; }
 .foot { opacity:.7; }
+.dot { position:absolute; width:6px; height:6px; border-radius:50%; pointer-events:none; }
