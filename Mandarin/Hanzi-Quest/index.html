@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hanzi-Quest — 闖關學字、升級打怪</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="theme-color" content="#ffffff" />
+</head>
+<body>
+  <header class="container">
+    <h1>Hanzi-Quest</h1>
+    <p class="sub">闖關學字、升級打怪 · 免安裝、打開就用</p>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="row">
+        <label for="charSelect">字表</label>
+        <select id="charSelect"></select>
+        <button id="prevBtn">上一題</button>
+        <button id="nextBtn">下一題</button>
+      </div>
+
+      <div class="board">
+        <canvas id="board" width="360" height="360"></canvas>
+        <div class="target">
+          <span id="targetChar">字</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="clearBtn">清除描紅</button>
+        <button id="finishBtn">完成本題</button>
+        <span id="result" aria-live="polite"></span>
+      </div>
+
+      <div class="row">
+        <details>
+          <summary>匯入自訂字表（每行一個字）</summary>
+          <textarea id="customList" rows="4" placeholder="每行一個字，例如：&#10;學&#10;習&#10;快&#10;樂"></textarea>
+          <button id="loadCustom">載入</button>
+        </details>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>成就概覽（示意）</h2>
+      <ul id="achievements" class="list"></ul>
+    </section>
+  </main>
+
+  <footer class="container foot">
+    <small>本頁面可離線使用（安裝到主畫面可更流暢）。不蒐集個資。</small>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    // 註冊 Service Worker（可離線，用不到也沒差）
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(()=>{})
+    }
+  </script>
+</body>
+</html>
