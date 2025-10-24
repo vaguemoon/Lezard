@@ -14,6 +14,7 @@ function renderTemplateGlyph(char, size=256) {
   let fontSize = size * 0.8
   ctx.font = `${fontSize}px system-ui, "Noto Sans CJK TC", sans-serif`
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  // 多次微調，讓字填滿方框（保留邊界）
   for (let k=0;k<4;k++){
     ctx.clearRect(0,0,size,size)
     ctx.fillText(char, size/2, size/2)
@@ -41,6 +42,7 @@ function roughBBox(ctx, size){
 }
 
 function captureStudentBitmap(size=256){
+  // 把目前主畫布的筆跡等比放大到 size×size，去掉邊距
   const src = el.canvas
   const c = document.createElement('canvas'); c.width=c.height=size
   const ctx = c.getContext('2d')
@@ -66,6 +68,7 @@ function inkBBox(canvas){
 }
 
 function toGridBool(canvas, N=64, threshold=64){
+  // 將畫布縮到 N×N，>threshold 當成 1
   const tmp = document.createElement('canvas'); tmp.width=tmp.height=N
   const tctx = tmp.getContext('2d')
   tctx.drawImage(canvas, 0,0, N,N)
@@ -81,6 +84,7 @@ function toGridBool(canvas, N=64, threshold=64){
 }
 
 function neighborHit(gridA, gridB, r=2){
+  // 對 gridA 的每個 1，檢查 gridB 半徑 r 內是否有 1
   const N = gridA.length
   let hit=0, total=0
   for (let y=0;y<N;y++){
@@ -102,6 +106,7 @@ function neighborHit(gridA, gridB, r=2){
 }
 
 function diffDots(gridStu, gridTpl, step=4){
+  // 回傳兩類差異點：stu-only（紅）、tpl-missing（藍）
   const N = gridStu.length
   const reds = [], blues = []
   for (let y=0;y<N;y+=step){
@@ -118,6 +123,7 @@ function clearDots() {
 }
 
 function placeDots(dots, color){
+  // 把差異點放到主畫布上（對應縮放）
   const N = 64
   clearDots()
   dots.reds.forEach(([x,y])=>{
@@ -192,7 +198,7 @@ function setChar(i) {
   const c = CharState.list[CharState.index]
   el.target.textContent = c
   clearCanvas()
-  clearDots() // ← 換題時移除提示點
+  clearDots() // 換題時移除提示點
   CharState.startAt = performance.now()
   CharState.drawnLength = 0
   el.result.textContent = ''
@@ -200,12 +206,13 @@ function setChar(i) {
 
 function clearCanvas() {
   ctx.clearRect(0,0,el.canvas.width, el.canvas.height)
+  // 助線
   ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--line')
   ctx.lineWidth = 1
   ctx.setLineDash([5,5])
   ctx.strokeRect(0.5,0.5,el.canvas.width-1, el.canvas.height-1)
   ctx.setLineDash([])
-  clearDots() // ← 清畫布時同步清提示點
+  clearDots() // 清畫布時同步清提示點
 }
 
 // 繪圖：滑鼠/觸控/筆
@@ -226,6 +233,7 @@ el.canvas.addEventListener('pointermove', e => moveDraw(e.offsetX,e.offsetY))
 window.addEventListener('pointerup', () => endDraw())
 
 function finishQuestion() {
+  // 1) 構建模板與學生位圖
   const char = CharState.list[CharState.index]
   const tplCanvas = renderTemplateGlyph(char, 256)
   const stuCanvas = captureStudentBitmap(256)
@@ -234,15 +242,18 @@ function finishQuestion() {
   const bbox = inkBBox(el.canvas)
   if (!bbox) { el.result.textContent = `評分：0 分，⭐ x 0`; clearDots(); updateAchievements(0); return }
 
+  // 2) 轉 64×64 網格
   const tplG = toGridBool(tplCanvas, 64, 40)
   const stuG = toGridBool(stuCanvas, 64, 40)
 
-  const coverage  = neighborHit(tplG, stuG, 2)
-  const precision = neighborHit(stuG, tplG, 2)
+  // 3) 兩向鄰近比對（半徑 r = 2 可容忍位移）
+  const coverage  = neighborHit(tplG, stuG, 2)   // 標準 → 學生
+  const precision = neighborHit(stuG, tplG, 2)   // 學生 → 標準
   const score = 0.6 * coverage + 0.4 * precision
   const stars = score >= 0.9 ? 3 : score >= 0.75 ? 2 : score >= 0.55 ? 1 : 0
   el.result.textContent = `評分：${Math.round(score*100)} 分，⭐ x ${stars}`
 
+  // 4) 視覺化回饋（紅=多畫或偏離；藍=漏畫）
   const wantFeedback = document.getElementById('showFeedback')?.checked
   if (wantFeedback){
     const dots = diffDots(stuG, tplG, 3)
@@ -251,6 +262,7 @@ function finishQuestion() {
     clearDots()
   }
 
+  // 5) 成就統計（沿用原本）
   updateAchievements(stars)
 }
 
