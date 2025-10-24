@@ -1,0 +1,9 @@
+{
+  "name": "Hanzi-Quest",
+  "short_name": "HanziQuest",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": []
+}
