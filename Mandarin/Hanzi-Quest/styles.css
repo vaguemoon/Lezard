@@ -1,17 +1,18 @@
-:root { color-scheme: light dark; --bg:#fff; --fg:#222; --line:#e5e5e5; }
-@media (prefers-color-scheme: dark){ :root{ --bg:#111; --fg:#eee; --line:#333; } }
-* { box-sizing: border-box; }
-html,body { margin:0; background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, "Noto Sans CJK TC", sans-serif; }
-.container { max-width: 960px; margin: 0 auto; padding: 16px; }
-.sub { opacity: .7; margin-top: -8px; }
-.panel { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 16px; }
-.row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; margin: 10px 0; }
-.board { position:relative; width:360px; height:360px; border:1px dashed var(--line); border-radius:12px; overflow:hidden; }
-.board canvas { width:360px; height:360px; touch-action: none; }
-.target { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; }
-.target span { font-size: 140px; opacity:.12; user-select:none; }
-button, select, textarea { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: inherit; }
-button { cursor:pointer; }
-.list { margin:0; padding-left: 18px; }
-.foot { opacity:.7; }
-.dot { position:absolute; width:6px; height:6px; border-radius:50%; pointer-events:none; }
+:root { color-scheme: light dark; --bg:#fff; --fg:#111; --line:#e5e5e5; }
+@media (prefers-color-scheme: dark){ :root{ --bg:#0f172a; --fg:#e5e7eb; --line:#1f2937; } }
+*{ box-sizing:border-box }
+html,body{ margin:0; background:var(--bg); color:var(--fg); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,PingFang TC,"Microsoft JhengHei",Arial; }
+.container{ max-width:960px; margin:0 auto; padding:20px; }
+.sub{ opacity:.7; margin-top:-6px }
+.panel{ border:1px solid var(--line); border-radius:14px; padding:14px; margin:16px 0 }
+.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0 }
+.board{ position:relative; width:360px; height:360px; border:1px dashed var(--line); border-radius:12px; overflow:hidden }
+.board canvas{ width:360px; height:360px; touch-action:none }
+.target{ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; transition:opacity .2s }
+.target span{ font-size:140px; opacity:.12; user-select:none }
+button,select,textarea{ padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:transparent; color:inherit }
+button{ cursor:pointer }
+.list{ margin:0; padding-left:18px }
+
+/* 回饋點：不遮擋操作、顯示在最上層 */
+.dot { position:absolute; width:6px; height:6px; border-radius:50%; pointer-events:none; z-index:3; }
