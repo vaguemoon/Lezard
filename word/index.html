@@ -70,6 +70,7 @@ body.big.mode-hear .btn{padding:10px 14px;font-size:16px}
 
   <div class="toolbar bottom">
     <button id="mode" class="btn">模式：看→說</button>
+    <button id="replay" class="btn ghost" style="display:none">🔊 再唸一次</button>
     <button id="mic" class="btn ghost">🎙 語音作答</button>
     <button id="next" class="btn ghost">下一題 ➜</button>
   </div>
@@ -110,6 +111,7 @@ const $ = (s) => document.querySelector(s);
 const btnNext = $("#next");
 const btnToggleMode = $("#mode");
 const btnMic = $("#mic");
+const btnReplay = $("#replay");
 const areaPrompt = $("#prompt");
 const areaChoices = $("#choices");
 const areaHint = $("#hint");
@@ -127,8 +129,11 @@ const GROUPS = window.GROUPS;
 
 // 根據模式切換版面響應（看→說放大、聽→找縮小＆隱藏麥克風）
 function syncModeUI(){
-  document.body.classList.toggle('mode-see', mode===MODE.SEE_SAY);
-  document.body.classList.toggle('mode-hear', mode===MODE.HEAR_PICK);
+  const isSee = mode===MODE.SEE_SAY;
+  document.body.classList.toggle('mode-see', isSee);
+  document.body.classList.toggle('mode-hear', !isSee);
+  // 題型：聽→找時顯示重播按鈕；看→說時隱藏
+  btnReplay.style.display = isSee ? 'none' : '';
 }
 
 // ---- 小工具 ----
@@ -187,7 +192,8 @@ function renderSeeSay(q){
 // 題型：聽→找（先唸名稱，四選一找部件）
 function renderHearPick(q){
   speak(q.name);
-  areaPrompt.textContent = '請找出：'+q.name;
+  // 聽找模式：不顯示文字題目，只播放語音。若需要可按「再唸一次」。
+  areaPrompt.textContent = '';
   areaChoices.innerHTML = '';
   for(const g of genChoices(q)){
     const b=document.createElement('button'); b.className='choice glyph'; b.textContent=g; b.onclick=()=>onAnswer(g===q.glyph, q); areaChoices.appendChild(b);
@@ -220,6 +226,9 @@ btnToggleMode.onclick = ()=>{
   syncModeUI();
   nextQuestion();
 };
+
+// 重播題目按鈕（僅聽→找時顯示）
+btnReplay.onclick = ()=>{ if(mode===MODE.HEAR_PICK && current){ speak(current.name); } };
 
 // 單鍵語音控制（mic 按鈕：開始作答 ↔ 送出答案）
 (function setupMic(){
