@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>部件快反練習 · MVP</title>
+<style>
+:root{ --bg:#0b0f14; --fg:#e6e6e6; --muted:#9aa4ad; --panel:#121821; --accent:#30d158; --warn:#ff453a; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,"Noto Sans TC",sans-serif}
+.app{max-width:720px;margin:0 auto;padding:16px 16px 96px}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 0}
+.h1{font-weight:800;font-size:20px}
+.toolbar{display:flex;gap:8px;align-items:center;justify-content:center}
+.toolbar.bottom{position:fixed;bottom:0;left:0;width:100%;background:#0b0f14;padding:16px 12px;border-top:2px solid #2a323c;z-index:10}
+.btn{background:var(--accent);color:#002b11;border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer}
+.btn.ghost{background:transparent;border:2px solid var(--fg);color:var(--fg)}
+#mic.on{border-color:var(--accent);color:var(--accent);animation:blink 1s infinite ease-in-out}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.45}}
+.panel{background:var(--panel);border-radius:16px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+#prompt{font-size:clamp(64px,16vw,120px);font-weight:900;text-align:center;letter-spacing:2px;margin:8px 0 12px}
+.choices{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.choice{background:#fff;color:#0b0f14;border:2px solid #3a424d;border-radius:14px;padding:20px;font-size:28px;cursor:pointer}
+.choice.glyph{font-size:96px;font-weight:900}
+.choice:focus{outline:3px solid var(--accent)}
+.hint{margin-top:12px;background:#f7d774;color:#000;padding:10px 12px;border-radius:8px;font-weight:bold;display:block}
+.mic-icon{display:inline-block;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.25)} }
+.stats{margin-top:8px;color:var(--muted);font-size:14px}
+hr{border:none;border-top:1px solid #2a323c;margin:12px 0}
+/* 大按鈕模式（預設啟用） */
+body.big .btn{padding:16px 22px;font-size:20px}
+body.big .choice{padding:24px;font-size:32px}
+body.big .choice.glyph{font-size:110px}
+</style>
+</head>
+<body class="big">
+<div class="app" role="application" aria-label="部件快反練習">
+  <header>
+    <div class="h1">部件快反練習 · MVP（Canvas 預覽）</div>
+  </header>
+
+  <section class="panel" aria-live="polite" aria-atomic="true">
+    <div id="prompt">—</div>
+    <div id="choices" class="choices"></div>
+    <div id="hint" class="hint"></div>
+    <hr>
+    <div id="stats" class="stats"></div>
+  </section>
+
+  <div class="toolbar bottom">
+    <button id="mode" class="btn">模式：看→說</button>
+    <button id="mic" class="btn ghost">🎙 語音作答</button>
+    <button id="next" class="btn ghost">下一題 ➜</button>
+  </div>
+</div>
+
+<script>
+// ===== data.js =====
+window.RADICALS = [
+  { glyph: "氵", name: "水部",   group: "water" },
+  { glyph: "扌", name: "手部",   group: "hand" },
+  { glyph: "艹", name: "草部",   group: "grass" },
+  { glyph: "亻", name: "人部",   group: "person" },
+  { glyph: "口", name: "口部",   group: "mouth" },
+  { glyph: "木", name: "木部",   group: "wood" },
+  { glyph: "忄", name: "心部",   group: "heart" },
+  { glyph: "辶", name: "走部",   group: "walk" },
+  { glyph: "刂", name: "刀部",   group: "knife" },
+  { glyph: "灬", name: "火部",   group: "fire" },
+  { glyph: "糹", name: "糸部",   group: "silk" },
+];
+window.GROUPS = {
+  water: ["忄","扌","氵","灬"],
+  hand: ["扌","氵","刂","亻"],
+  grass: ["艹","竹(⺮)","廾","卄"],
+  person: ["亻","入","丿","人"],
+  mouth: ["口","囗","日","田"],
+  wood: ["木","本","未","十"],
+  heart: ["忄","氵","小","丬"],
+  walk: ["辶","廴","冖","⻌"],
+  knife: ["刂","刀","丨","丿"],
+  fire: ["灬","点","丶","小"],
+  silk: ["糹","纟","幺","糸"],
+};
+</script>
+<script>
+// ===== app.js =====
+const $ = (s) => document.querySelector(s);
+const btnNext = $("#next");
+const btnToggleMode = $("#mode");
+const btnMic = $("#mic");
+const areaPrompt = $("#prompt");
+const areaChoices = $("#choices");
+const areaHint = $("#hint");
+const areaStats = $("#stats");
+
+const MODE = { SEE_SAY: "see_say", HEAR_PICK: "hear_pick" };
+let mode = MODE.SEE_SAY;
+let weights = {};
+let current = null;
+let total = 0, correct = 0;
+let SR = null; let rec = null; let voiceEnabled = false;
+
+const BANK = window.RADICALS;
+const GROUPS = window.GROUPS;
+
+// ---- 小工具 ----
+const rng = (n) => Math.floor(Math.random() * n);
+const speak = (text) => { try { const u = new SpeechSynthesisUtterance(text); u.lang = "zh-TW"; speechSynthesis.cancel(); speechSynthesis.speak(u);} catch (_) {} };
+// Web Audio SFX（零音檔）
+let _actx; function _ensureCtx(){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); }catch(_){ _actx=null; } return _actx; }
+function beep(freq=880, dur=0.12, type='sine', gain=0.05){ const c=_ensureCtx(); if(!c) return; const o=c.createOscillator(), g=c.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=gain; o.connect(g); g.connect(c.destination); o.start(); setTimeout(()=>o.stop(), dur*1000); }
+function sfxCorrect(){ beep(880,0.1,'sine'); setTimeout(()=>beep(1320,0.1,'sine'), 120); }
+function sfxWrong(){ const c=_ensureCtx(); if(!c) return; const o1=c.createOscillator(), o2=c.createOscillator(), g=c.createGain(); o1.type='square'; o2.type='square'; o1.frequency.value=220; o2.frequency.value=160; g.gain.value=0.03; o1.connect(g); o2.connect(g); g.connect(c.destination); o1.start(); o2.start(); setTimeout(()=>{ o1.stop(); o2.stop(); }, 160); }
+
+// 記錄（本機）
+function saveWeights(){ localStorage.setItem('weights', JSON.stringify(weights)); }
+function loadWeights(){ try{ weights = JSON.parse(localStorage.getItem('weights')||'{}'); }catch{ weights = {}; } BANK.forEach(x=>{ if(!(x.glyph in weights)) weights[x.glyph]=1; }); }
+loadWeights();
+
+// 出題
+function pickWeighted(){ const arr=BANK.map(x=>({item:x,w:Math.max(1,Number(weights[x.glyph]||1))})); const sum=arr.reduce((s,a)=>s+a.w,0); let t=Math.random()*sum; for(const a of arr){ if((t-=a.w)<=0) return a.item; } return arr[arr.length-1].item; }
+function genChoices(answer){ const group=GROUPS[answer.group]||[]; const wrongs=[]; const pool=[...BANK.filter(x=>x.glyph!==answer.glyph && group.includes(x.glyph)).map(x=>x.glyph), ...BANK.filter(x=>x.glyph!==answer.glyph && !group.includes(x.glyph)).map(x=>x.glyph)]; while(wrongs.length<3 && pool.length){ const g=pool.splice(rng(pool.length),1)[0]; if(!wrongs.includes(g)) wrongs.push(g);} return [answer.glyph, ...wrongs].sort(()=>0.5-Math.random()); }
+
+// 題型：看→說（顯示部件，答案選名稱）
+function renderSeeSay(q){
+  // 純語音作答：不顯示選項，需語音支援
+  if(!SR){
+    // 不支援語音時自動切到「聽→找」
+    mode = MODE.HEAR_PICK;
+    btnToggleMode.textContent = '模式：聽→找';
+    return renderHearPick(q);
+  }
+  areaPrompt.textContent = q.glyph;
+  areaChoices.innerHTML = '';
+  areaHint.innerHTML = '<span class="mic-icon">🎙</span> 正在聽你說...請念出部首（例如：水部）';
+
+  // 若語音啟用，開始辨識；否則提示開啟麥克風
+  if(voiceEnabled){
+    if(!rec){
+      rec = new SR();
+      rec.lang = 'zh-TW';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onend = ()=>{ if(voiceEnabled) { try{ rec.start(); }catch(_){} } };
+    }
+    rec.onresult = (e)=>{
+      const said = (e.results[0][0].transcript||'').trim();
+      const ok = said.includes(q.name);
+      onAnswer(ok, q);
+    };
+    try{ rec.start(); }catch(_){ }
+    btnMic.classList.add('on');
+  } else {
+    btnMic.classList.remove('on');
+  }
+}
+
+
+// 題型：聽→找（先唸名稱，四選一找部件）
+function renderHearPick(q){
+  speak(q.name);
+  areaPrompt.textContent = '請找出：'+q.name;
+  areaChoices.innerHTML = '';
+  for(const g of genChoices(q)){
+    const b=document.createElement('button'); b.className='choice glyph'; b.textContent=g; b.onclick=()=>onAnswer(g===q.glyph, q); areaChoices.appendChild(b);
+  }
+}
+
+function nextQuestion(){
+  current = pickWeighted();
+  areaHint.textContent = '';
+  if(mode===MODE.SEE_SAY) renderSeeSay(current); else renderHearPick(current);
+}
+
+function onAnswer(ok, q){
+  total += 1; if(ok) correct += 1;
+  weights[q.glyph] = Math.max(1, (weights[q.glyph]||1) + (ok?-1:+1));
+  saveWeights();
+  if(ok) sfxCorrect(); else sfxWrong();
+  speak(q.name);
+  areaHint.textContent = (ok?'✅ 正確！':'❌ 再試試') + '　' + q.name;
+  updateStats();
+}
+
+function updateStats(){ const rate = total? Math.round(100*correct/total):0; areaStats.textContent = `本次：${correct}/${total}（${rate}%）`; }
+
+// 事件綁定
+btnNext.onclick = nextQuestion;
+btnToggleMode.onclick = ()=>{ mode = (mode===MODE.SEE_SAY)? MODE.HEAR_PICK : MODE.SEE_SAY; btnToggleMode.textContent = (mode===MODE.SEE_SAY? '模式：看→說' : '模式：聽→找'); nextQuestion(); };
+
+// 單鍵語音控制（mic 按鈕：開始作答 ↔ 送出答案）
+(function setupMic(){
+  SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  btnMic.textContent = '🎙 開始作答';
+  if(!SR){ btnMic.title='此裝置不支援語音辨識'; btnMic.disabled=true; }
+  btnMic.onclick = ()=>{
+    voiceEnabled = !voiceEnabled;
+    if(voiceEnabled && SR){
+      rec = new SR(); rec.lang='zh-TW'; rec.interimResults=false; rec.maxAlternatives=1;
+      rec.onresult = (e)=>{
+        const said=(e.results[0][0].transcript||'').trim();
+        const ok = said.includes(current.name);
+        onAnswer(ok, current);
+      };
+      rec.onend = ()=>{ if(voiceEnabled) try{ rec.start(); }catch(_){ } };
+      try{ rec.start(); }catch(_){}
+      btnMic.classList.add('on');
+      btnMic.textContent = '🎙 送出答案';
+      areaHint.textContent = '🎙 請念出部首名稱，例如：水部';
+    } else {
+      try{ rec && rec.stop(); }catch(_){}
+      btnMic.classList.remove('on');
+      btnMic.textContent = '🎙 開始作答';
+      areaHint.textContent = '';
+    }
+  };
+})();
+
+updateStats();
+nextQuestion();
+</script>
+</body>
+</html>
