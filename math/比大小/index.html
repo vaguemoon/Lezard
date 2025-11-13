@@ -112,7 +112,7 @@
       font-weight: 700;
     }
 
-    /* 下方控制列：模式＋範圍在同一行 */
+    /* 下方控制列 */
     .controls-row {
       border-top: 1px dashed var(--border);
       padding-top: 6px;
@@ -132,11 +132,11 @@
     }
 
     .mode-group {
-      flex: 1 1 180px;
+      flex: 1 1 220px;
     }
 
     .range-group {
-      flex: 1 1 220px;
+      flex: 1 1 260px;
       justify-content: flex-end;
     }
 
@@ -145,23 +145,30 @@
       white-space: nowrap;
     }
 
-    .mode-btn {
+    .btn-pill {
       border-radius: 10px;
       padding: 4px 10px;
       border: 2px solid var(--border);
       background: transparent;
       cursor: pointer;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 700;
       transition: background 0.1s, border-color 0.1s, color 0.1s,
         transform 0.08s;
+      white-space: nowrap;
     }
 
-    .mode-btn.active {
+    .btn-pill.active {
       background: var(--accent-soft);
       border-color: var(--accent);
       color: var(--accent);
       transform: translateY(-1px);
+    }
+
+    .btn-pill.disabled {
+      opacity: 0.4;
+      border-style: dashed;
+      pointer-events: none;
     }
 
     .mode-hint {
@@ -205,6 +212,15 @@
       .numbers-row {
         gap: clamp(16px, 8vw, 40px);
       }
+
+      .controls-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .range-group {
+        justify-content: flex-start;
+      }
     }
 
     @media (orientation: landscape) and (max-height: 480px) {
@@ -219,7 +235,7 @@
     <div class="app-header">
       <div>
         <div class="title">數字比大小練習</div>
-        <div class="subtitle">點選正確的數字，馬上聽音效換下一題</div>
+        <div class="subtitle">兩種玩法：比大小 / 和基準數比</div>
       </div>
       <button class="dark-toggle" id="darkToggle">🌙 暗色模式</button>
     </div>
@@ -235,11 +251,16 @@
 
     <div class="controls-row">
       <div class="mode-group">
-        <span class="controls-label">模式：</span>
-        <button class="mode-btn active" id="modeBig">大</button>
-        <button class="mode-btn" id="modeSmall">小</button>
+        <span class="controls-label">玩法：</span>
+        <button class="btn-pill active" id="gameTwo">兩數比</button>
+        <button class="btn-pill" id="gameBase">比基準</button>
+
+        <span class="controls-label">目標：</span>
+        <button class="btn-pill" id="modeBig">大</button>
+        <button class="btn-pill" id="modeSmall">小</button>
+
         <span class="mode-hint" id="modeHint">
-          當前：大（點選較大的數字）
+          兩數比大小：目前 <strong>大</strong>（點選較大的數字）
         </span>
       </div>
 
@@ -249,6 +270,10 @@
         <span>～</span>
         <input type="number" id="maxVal" value="20" />
         <button id="updateRange">更新</button>
+
+        <span class="controls-label">基準：</span>
+        <input type="number" id="baseVal" value="50" />
+
         <span class="range-tip" id="rangeTip">目前：0 ～ 20</span>
       </div>
     </div>
@@ -261,22 +286,30 @@
       var cardLeft = document.getElementById("cardLeft");
       var cardRight = document.getElementById("cardRight");
 
+      // 玩法 / 模式
+      var gameTwoBtn = document.getElementById("gameTwo");
+      var gameBaseBtn = document.getElementById("gameBase");
       var modeBigBtn = document.getElementById("modeBig");
       var modeSmallBtn = document.getElementById("modeSmall");
       var modeHint = document.getElementById("modeHint");
 
+      // 範圍 & 基準
       var minInput = document.getElementById("minVal");
       var maxInput = document.getElementById("maxVal");
+      var baseInput = document.getElementById("baseVal");
       var rangeTip = document.getElementById("rangeTip");
       var updateRangeBtn = document.getElementById("updateRange");
 
+      // 暗色模式
       var darkToggle = document.getElementById("darkToggle");
 
       var min = 0;
       var max = 20;
-      var currentNum1 = null;
-      var currentNum2 = null;
-      var mode = "big"; // "big" or "small"
+      var gameType = "two"; // "two" 或 "base"
+      var mode = "big";     // "big" 或 "small"（只在 two 模式有用）
+
+      var currentNum1 = null; // 左格
+      var currentNum2 = null; // 右格
       var lock = false;
 
       // Web Audio 音效
@@ -289,7 +322,7 @@
         }
       }
 
-      // 答對：上升三音「叮叮叮」的感覺
+      // 答對：上升三音「叮叮叮」
       function playCorrectSound() {
         ensureAudioContext();
         var now = audioCtx.currentTime;
@@ -303,16 +336,15 @@
         gain.gain.setValueAtTime(0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
 
-        // 三個不同頻率的階梯（C5 → E5 → G5 之類）
-        osc.frequency.setValueAtTime(660, now);        // 1
-        osc.frequency.setValueAtTime(880, now + 0.2);  // 2
-        osc.frequency.setValueAtTime(1040, now + 0.4); // 3
+        osc.frequency.setValueAtTime(660, now);
+        osc.frequency.setValueAtTime(880, now + 0.2);
+        osc.frequency.setValueAtTime(1040, now + 0.4);
 
         osc.start(now);
         osc.stop(now + 0.6);
       }
 
-      // 答錯：低沉「嗡──」往下掉，有明顯失敗感
+      // 答錯：低沉往下掉「嗡──」
       function playWrongSound() {
         ensureAudioContext();
         var now = audioCtx.currentTime;
@@ -339,36 +371,118 @@
         return Math.floor(Math.random() * (ma - mi + 1)) + mi;
       }
 
-      function generateQuestion() {
-        lock = false;
-        var a = getRandomIntInclusive(min, max);
-        var b = getRandomIntInclusive(min, max);
-
-        if (max > min) {
-          while (a === b) {
-            a = getRandomIntInclusive(min, max);
-            b = getRandomIntInclusive(min, max);
+      function updateModeHint() {
+        if (gameType === "two") {
+          if (mode === "big") {
+            modeHint.innerHTML =
+              '兩數比大小：目前 <strong>大</strong>（點選較大的數字）';
+          } else {
+            modeHint.innerHTML =
+              '兩數比大小：目前 <strong>小</strong>（點選較小的數字）';
           }
+        } else {
+          modeHint.innerHTML =
+            '和基準數比：左格為基準，若右邊超過基準就點右格，否則點左格。';
+        }
+      }
+
+      function updateButtonsUI() {
+        // 玩法按鈕
+        if (gameType === "two") {
+          gameTwoBtn.classList.add("active");
+          gameBaseBtn.classList.remove("active");
+        } else {
+          gameBaseBtn.classList.add("active");
+          gameTwoBtn.classList.remove("active");
         }
 
-        currentNum1 = a;
-        currentNum2 = b;
-        num1El.textContent = a;
-        num2El.textContent = b;
+        // 大 / 小 按鈕
+        if (mode === "big") {
+          modeBigBtn.classList.add("active");
+          modeSmallBtn.classList.remove("active");
+        } else {
+          modeSmallBtn.classList.add("active");
+          modeBigBtn.classList.remove("active");
+        }
+
+        // 在基準模式時，大／小只是「關閉」狀態（不能點）
+        if (gameType === "two") {
+          modeBigBtn.classList.remove("disabled");
+          modeSmallBtn.classList.remove("disabled");
+        } else {
+          modeBigBtn.classList.add("disabled");
+          modeSmallBtn.classList.add("disabled");
+        }
+
+        updateModeHint();
+      }
+
+      function generateQuestion() {
+        lock = false;
+
+        if (gameType === "two") {
+          // 兩數比大小：左右都是隨機數
+          var a = getRandomIntInclusive(min, max);
+          var b = getRandomIntInclusive(min, max);
+
+          if (max > min) {
+            while (a === b) {
+              a = getRandomIntInclusive(min, max);
+              b = getRandomIntInclusive(min, max);
+            }
+          }
+
+          currentNum1 = a;
+          currentNum2 = b;
+          num1El.textContent = a;
+          num2El.textContent = b;
+        } else {
+          // 和基準數比：左邊基準，右邊隨機數
+          var base = Number(baseInput.value);
+          if (isNaN(base)) {
+            base = min;
+            baseInput.value = base;
+          }
+
+          var r = getRandomIntInclusive(min, max);
+          // 可以允許和基準一樣，讓學生練習「沒有超過」
+          currentNum1 = base; // 左：基準
+          currentNum2 = r;    // 右：題目數字
+
+          num1El.textContent = base;
+          num2El.textContent = r;
+        }
       }
 
       function checkAnswer(chosenSide) {
         if (lock) return;
         lock = true;
 
-        var chosenValue = chosenSide === "left" ? currentNum1 : currentNum2;
-        var otherValue = chosenSide === "left" ? currentNum2 : currentNum1;
+        var chosenValue =
+          chosenSide === "left" ? currentNum1 : currentNum2;
+        var otherValue =
+          chosenSide === "left" ? currentNum2 : currentNum1;
 
-        var shouldPickBigger = mode === "big";
-        var isCorrect =
-          shouldPickBigger
+        var isCorrect = false;
+
+        if (gameType === "two") {
+          // 兩數比大小
+          var shouldPickBigger = mode === "big";
+          isCorrect = shouldPickBigger
             ? chosenValue > otherValue
             : chosenValue < otherValue;
+        } else {
+          // 和基準數比：左 = 基準，右 = 題目
+          var base = currentNum1;
+          var randomNum = currentNum2;
+          if (chosenSide === "right") {
+            // 學生認為「有超過基準」
+            isCorrect = randomNum > base;
+          } else {
+            // 學生認為「沒有超過基準」
+            isCorrect = randomNum <= base;
+          }
+        }
 
         if (isCorrect) {
           playCorrectSound();
@@ -386,20 +500,33 @@
         checkAnswer("right");
       };
 
+      // 玩法切換
+      gameTwoBtn.onclick = function () {
+        gameType = "two";
+        updateButtonsUI();
+        generateQuestion();
+      };
+
+      gameBaseBtn.onclick = function () {
+        gameType = "base";
+        updateButtonsUI();
+        generateQuestion();
+      };
+
+      // 大 / 小 模式（只在 兩數比 大小 有用）
       modeBigBtn.onclick = function () {
+        if (gameType !== "two") return;
         mode = "big";
-        modeBigBtn.classList.add("active");
-        modeSmallBtn.classList.remove("active");
-        modeHint.innerHTML = "當前：<strong>大</strong>（點選較大的數字）";
+        updateButtonsUI();
       };
 
       modeSmallBtn.onclick = function () {
+        if (gameType !== "two") return;
         mode = "small";
-        modeSmallBtn.classList.add("active");
-        modeBigBtn.classList.remove("active");
-        modeHint.innerHTML = "當前：<strong>小</strong>（點選較小的數字）";
+        updateButtonsUI();
       };
 
+      // 更新範圍
       updateRangeBtn.onclick = function () {
         var newMin = Number(minInput.value);
         var newMax = Number(maxInput.value);
@@ -419,11 +546,13 @@
         generateQuestion();
       };
 
+      // 暗色模式
       darkToggle.onclick = function () {
         document.body.classList.toggle("dark");
       };
 
-      // 初始一題
+      // 初始化 UI & 第一題
+      updateButtonsUI();
       generateQuestion();
     };
   </script>
