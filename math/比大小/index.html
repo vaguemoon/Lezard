@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>數字比大小練習</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --card-bg: #fafafe;
+      --border: #d0d0e0;
+      --text: #222;
+      --subtext: #555;
+      --accent: #4f46e5;
+      --accent-soft: #e0e7ff;
+      --range-border: #ccc;
+    }
+
+    body.dark {
+      --bg: #121212;
+      --card-bg: #1f1f26;
+      --border: #3a3a4a;
+      --text: #f7f7ff;
+      --subtext: #b0b0c0;
+      --accent: #a5b4fc;
+      --accent-soft: #312e81;
+      --range-border: #555;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 12px 12px;
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 4px;
+    }
+
+    .title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      color: var(--subtext);
+    }
+
+    .dark-toggle {
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--subtext);
+      font-size: 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* 中間大數字正方形格子區 */
+    .numbers-row {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: clamp(20px, 6vw, 70px); /* 中間距離加大，避免誤觸 */
+      margin: 4px 0 8px;
+    }
+
+    .number-card {
+      flex: 0 0 auto;
+      width: min(40vmin, 42vw); /* 依螢幕自動縮放 */
+      aspect-ratio: 1 / 1;      /* 正方形 */
+      border-radius: 16px;
+      border: 3px solid var(--border);
+      background: var(--card-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.08s ease, box-shadow 0.08s ease,
+        border-color 0.08s ease, background 0.1s;
+    }
+
+    .number-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .number-value {
+      font-size: clamp(3rem, 10vw, 5.5rem);
+      font-weight: 700;
+    }
+
+    /* 下方控制列：模式＋範圍在同一行 */
+    .controls-row {
+      border-top: 1px dashed var(--border);
+      padding-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .mode-group,
+    .range-group {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .mode-group {
+      flex: 1 1 180px;
+    }
+
+    .range-group {
+      flex: 1 1 220px;
+      justify-content: flex-end;
+    }
+
+    .controls-label {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .mode-btn {
+      border-radius: 10px;
+      padding: 4px 10px;
+      border: 2px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 700;
+      transition: background 0.1s, border-color 0.1s, color 0.1s,
+        transform 0.08s;
+    }
+
+    .mode-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .mode-hint {
+      font-size: 0.78rem;
+      color: var(--subtext);
+      white-space: nowrap;
+    }
+
+    .range-group input[type="number"] {
+      width: 70px;
+      padding: 3px 5px;
+      border-radius: 6px;
+      border: 1px solid var(--range-border);
+      font-size: 0.85rem;
+      background: transparent;
+      color: var(--text);
+    }
+
+    .range-group button {
+      padding: 3px 8px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.78rem;
+      background: var(--accent);
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    .range-tip {
+      font-size: 0.75rem;
+      color: var(--subtext);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        padding: 8px;
+      }
+
+      .numbers-row {
+        gap: clamp(16px, 8vw, 40px);
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 480px) {
+      .number-card {
+        width: min(35vmin, 32vw);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="app-header">
+      <div>
+        <div class="title">數字比大小練習</div>
+        <div class="subtitle">點選正確的數字，馬上聽音效換下一題</div>
+      </div>
+      <button class="dark-toggle" id="darkToggle">🌙 暗色模式</button>
+    </div>
+
+    <div class="numbers-row">
+      <div class="number-card" id="cardLeft">
+        <div class="number-value" id="num1">–</div>
+      </div>
+      <div class="number-card" id="cardRight">
+        <div class="number-value" id="num2">–</div>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <div class="mode-group">
+        <span class="controls-label">模式：</span>
+        <button class="mode-btn active" id="modeBig">大</button>
+        <button class="mode-btn" id="modeSmall">小</button>
+        <span class="mode-hint" id="modeHint">
+          當前：大（點選較大的數字）
+        </span>
+      </div>
+
+      <div class="range-group">
+        <span class="controls-label">範圍：</span>
+        <input type="number" id="minVal" value="0" />
+        <span>～</span>
+        <input type="number" id="maxVal" value="20" />
+        <button id="updateRange">更新</button>
+        <span class="range-tip" id="rangeTip">目前：0 ～ 20</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function () {
+      var num1El = document.getElementById("num1");
+      var num2El = document.getElementById("num2");
+      var cardLeft = document.getElementById("cardLeft");
+      var cardRight = document.getElementById("cardRight");
+
+      var modeBigBtn = document.getElementById("modeBig");
+      var modeSmallBtn = document.getElementById("modeSmall");
+      var modeHint = document.getElementById("modeHint");
+
+      var minInput = document.getElementById("minVal");
+      var maxInput = document.getElementById("maxVal");
+      var rangeTip = document.getElementById("rangeTip");
+      var updateRangeBtn = document.getElementById("updateRange");
+
+      var darkToggle = document.getElementById("darkToggle");
+
+      var min = 0;
+      var max = 20;
+      var currentNum1 = null;
+      var currentNum2 = null;
+      var mode = "big"; // "big" or "small"
+      var lock = false;
+
+      // Web Audio 音效
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      var audioCtx = new AudioCtx();
+
+      function ensureAudioContext() {
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      }
+
+      // 答對：上升三音「叮叮叮」的感覺
+      function playCorrectSound() {
+        ensureAudioContext();
+        var now = audioCtx.currentTime;
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+
+        osc.type = "triangle";
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        // 三個不同頻率的階梯（C5 → E5 → G5 之類）
+        osc.frequency.setValueAtTime(660, now);        // 1
+        osc.frequency.setValueAtTime(880, now + 0.2);  // 2
+        osc.frequency.setValueAtTime(1040, now + 0.4); // 3
+
+        osc.start(now);
+        osc.stop(now + 0.6);
+      }
+
+      // 答錯：低沉「嗡──」往下掉，有明顯失敗感
+      function playWrongSound() {
+        ensureAudioContext();
+        var now = audioCtx.currentTime;
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+
+        osc.type = "sawtooth";
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.linearRampToValueAtTime(120, now + 0.5);
+
+        osc.start(now);
+        osc.stop(now + 0.5);
+      }
+
+      function getRandomIntInclusive(a, b) {
+        var mi = Math.ceil(a);
+        var ma = Math.floor(b);
+        return Math.floor(Math.random() * (ma - mi + 1)) + mi;
+      }
+
+      function generateQuestion() {
+        lock = false;
+        var a = getRandomIntInclusive(min, max);
+        var b = getRandomIntInclusive(min, max);
+
+        if (max > min) {
+          while (a === b) {
+            a = getRandomIntInclusive(min, max);
+            b = getRandomIntInclusive(min, max);
+          }
+        }
+
+        currentNum1 = a;
+        currentNum2 = b;
+        num1El.textContent = a;
+        num2El.textContent = b;
+      }
+
+      function checkAnswer(chosenSide) {
+        if (lock) return;
+        lock = true;
+
+        var chosenValue = chosenSide === "left" ? currentNum1 : currentNum2;
+        var otherValue = chosenSide === "left" ? currentNum2 : currentNum1;
+
+        var shouldPickBigger = mode === "big";
+        var isCorrect =
+          shouldPickBigger
+            ? chosenValue > otherValue
+            : chosenValue < otherValue;
+
+        if (isCorrect) {
+          playCorrectSound();
+        } else {
+          playWrongSound();
+        }
+
+        setTimeout(generateQuestion, 450);
+      }
+
+      cardLeft.onclick = function () {
+        checkAnswer("left");
+      };
+      cardRight.onclick = function () {
+        checkAnswer("right");
+      };
+
+      modeBigBtn.onclick = function () {
+        mode = "big";
+        modeBigBtn.classList.add("active");
+        modeSmallBtn.classList.remove("active");
+        modeHint.innerHTML = "當前：<strong>大</strong>（點選較大的數字）";
+      };
+
+      modeSmallBtn.onclick = function () {
+        mode = "small";
+        modeSmallBtn.classList.add("active");
+        modeBigBtn.classList.remove("active");
+        modeHint.innerHTML = "當前：<strong>小</strong>（點選較小的數字）";
+      };
+
+      updateRangeBtn.onclick = function () {
+        var newMin = Number(minInput.value);
+        var newMax = Number(maxInput.value);
+
+        if (isNaN(newMin) || isNaN(newMax)) {
+          alert("請輸入正確的數字。");
+          return;
+        }
+        if (newMin > newMax) {
+          alert("最小值不能比最大值大！");
+          return;
+        }
+
+        min = newMin;
+        max = newMax;
+        rangeTip.textContent = "目前：" + min + " ～ " + max;
+        generateQuestion();
+      };
+
+      darkToggle.onclick = function () {
+        document.body.classList.toggle("dark");
+      };
+
+      // 初始一題
+      generateQuestion();
+    };
+  </script>
+</body>
+</html>
